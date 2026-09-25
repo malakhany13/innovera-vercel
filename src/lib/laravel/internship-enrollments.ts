@@ -97,6 +97,10 @@ function parseEnrollment(value: unknown): InternshipEnrollment | null {
     totalScore: asNumber(record.total_score) ?? asNumber(record.totalScore),
     totalScoreMax:
       asNumber(record.total_score_max) ?? asNumber(record.totalScoreMax),
+    attemptsUsed:
+      asNumber(record.attempts_used) ?? asNumber(record.attemptsUsed),
+    maxAttempts:
+      asNumber(record.max_attempts) ?? asNumber(record.maxAttempts),
     createdAt:
       asTrimmedString(record.created_at) ?? asTrimmedString(record.createdAt),
     updatedAt:
