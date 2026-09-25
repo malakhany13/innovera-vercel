@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
   const origins = laravelApiOrigins();
   if (origins.length === 0) {
-    return NextResponse.json({ error: "Laravel API is not configured" }, { status: 503 });
+    return NextResponse.json({ error: "API is not configured" }, { status: 503 });
   }
 
   const hosts = allowedHostnames(origins);

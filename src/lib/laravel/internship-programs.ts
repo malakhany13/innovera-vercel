@@ -103,7 +103,7 @@ export function parseInternshipProgramsPayload(
 export async function fetchInternshipPrograms(): Promise<InternshipProgram[]> {
   if (!hasLaravelBackend()) {
     throw new InternshipProgramsError(
-      "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+      "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       503,
     );
   }

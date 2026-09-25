@@ -15,12 +15,14 @@ const withBundleAnalyzer = bundleAnalyzer({
  */
 const DIRECTUS_URL = getPublicDirectusUrl();
 
-/** Laravel API origin for next-dev payment / v1 rewrites. */
-const LARAVEL_REWRITE_URL = (
+/** Backend API origin for next-dev payment / v1 rewrites. */
+const API_REWRITE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+  process.env.API_BASE_URL?.trim() ||
   process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim() ||
   process.env.LARAVEL_API_BASE_URL?.trim() ||
   process.env.PAYMENT_API_BASE_URL?.trim() ||
-  "https://www.innoveracorp.com"
+  "https://innovera-testing-production.up.railway.app"
 ).replace(/\/$/, "");
 
 function isLocalDirectusHost(): boolean {
@@ -66,9 +68,9 @@ function directusRemotePattern() {
  * (legacy image_path values) — so allow the whole origin rather than one prefix.
  */
 function laravelRemotePattern() {
-  if (!LARAVEL_REWRITE_URL) return null;
+  if (!API_REWRITE_URL) return null;
   try {
-    const url = new URL(LARAVEL_REWRITE_URL);
+    const url = new URL(API_REWRITE_URL);
     return {
       protocol: url.protocol.replace(":", "") as "http" | "https",
       hostname: url.hostname,
@@ -90,7 +92,7 @@ function isLocalHostname(hostname: string): boolean {
 
 function isLocalLaravelHost(): boolean {
   try {
-    return isLocalHostname(new URL(LARAVEL_REWRITE_URL).hostname);
+    return isLocalHostname(new URL(API_REWRITE_URL).hostname);
   } catch {
     return false;
   }
@@ -138,6 +140,7 @@ const EXTERNAL_IMAGE_HOSTS = [
   "techtorium.ac.nz",
   "www.innoveracorp.com",
   "innoveracorp.com",
+  "innovera-testing-production.up.railway.app",
   "static.cdnlogo.com",
   "i0.wp.com",
 ] as const;
@@ -259,13 +262,13 @@ const nextConfig: NextConfig = {
               destination: `${DIRECTUS_URL}/:path*`,
             },
           ];
-          if (LARAVEL_REWRITE_URL) {
+          if (API_REWRITE_URL) {
             rules.push(
-              // So client fallback `/api/v1/news|events` hits Laravel, not the
+              // So client fallback `/api/v1/news|events` hits the Railway API, not the
               // App Router catch-all (which returns HTML 200).
               {
                 source: "/api/v1/:path*",
-                destination: `${LARAVEL_REWRITE_URL}/api/v1/:path*`,
+                destination: `${API_REWRITE_URL}/api/v1/:path*`,
               },
             );
           }

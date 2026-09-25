@@ -43,11 +43,11 @@ export interface RegisterRequest {
 }
 
 /**
- * Auth RTK API — same-origin BFF paths from {@link Config.AUTH}
- * (e.g. `/api/student/login` on localhost:3001 in next-dev).
+ * Auth RTK API — paths from {@link Config.AUTH} on {@link Config.BACK_END_URL}
+ * (Railway API host, e.g. …/api/student/register).
  */
 const authBaseQuery = fetchBaseQuery({
-  baseUrl: "",
+  baseUrl: Config.BACK_END_URL,
   prepareHeaders: (headers) => {
     headers.set("Accept", "application/json");
     return headers;

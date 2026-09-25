@@ -2,7 +2,7 @@
 export function getChatbotApiBaseUrl(): string {
   const fromEnv = process.env.CHATBOT_API_BASE_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return "https://www.innoveracorp.com/chatbot/api";
+  return "https://innovera-testing-production.up.railway.app/chatbot/api";
 }
 
 export const CHATBOT_CHAT_PATH = "/chat.php";

@@ -20,10 +20,8 @@ import {
   isInternshipScorePassing,
 } from "./constants";
 import InternshipResultStep from "./InternshipResultStep";
-import {
-  fetchInternshipProgramsClient,
-  useInternshipProgram,
-} from "@/lib/laravel/internship-programs-client";
+import { useInternshipProgram } from "@/lib/laravel/internship-programs-client";
+import { useGetInternshipProgramsQuery } from "@/store/baseApi";
 
 type InterviewStepMode = "field" | "link";
 
@@ -74,10 +72,6 @@ export default function InternshipInterviewStep({
   const [programId, setProgramId] = useState<number | "">(
     selection?.programId ?? "",
   );
-  const [options, setOptions] = useState<FieldOption[]>([]);
-  const [loading, setLoading] = useState(mode === "field");
-  const [loadError, setLoadError] = useState<string | null>(null);
-
   const [paymentChecking, setPaymentChecking] = useState(mode === "link");
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
@@ -90,75 +84,64 @@ export default function InternshipInterviewStep({
   );
   const [score, setScore] = useState<{ total: number; max: number } | null>(null);
   const [continuing, setContinuing] = useState(false);
+
+  const {
+    data: allPrograms = [],
+    isLoading: programsLoading,
+    isError: programsQueryError,
+    error: programsError,
+  } = useGetInternshipProgramsQuery(undefined, {
+    skip: mode !== "field",
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const { program: liveProgram } = useInternshipProgram(
     mode === "link" ? selection?.programId ?? null : null,
   );
 
+  const pricedPrograms = useMemo(
+    () => allPrograms.filter((program) => Boolean(program.price)),
+    [allPrograms],
+  );
+
+  const options: FieldOption[] = useMemo(
+    () =>
+      pricedPrograms.map((program) => ({
+        programId: program.id,
+        label: program.title || `Program #${program.id}`,
+        description: program.description,
+        price: program.price,
+      })),
+    [pricedPrograms],
+  );
+
+  const loading = mode === "field" && programsLoading;
+  const loadError =
+    mode !== "field"
+      ? null
+      : programsQueryError
+        ? typeof programsError === "object" &&
+          programsError !== null &&
+          "error" in programsError &&
+          typeof (programsError as { error?: unknown }).error === "string"
+          ? (programsError as { error: string }).error
+          : "Unable to load internship programs."
+        : !programsLoading && allPrograms.length === 0
+          ? "No internship programs are available right now. Please try again later."
+          : !programsLoading &&
+              allPrograms.length > 0 &&
+              pricedPrograms.length === 0
+            ? "Internship programs are configured but none have a price set. Please contact support."
+            : null;
+
   useEffect(() => {
-    if (mode !== "field") return;
-
-    let cancelled = false;
-
-    async function loadPrograms() {
-      setLoading(true);
-      setLoadError(null);
-
-      try {
-        const allPrograms = await fetchInternshipProgramsClient();
-        // A program with no price can't be paid for, so it can't be enrolled in —
-        // but dropping it silently renders an empty dropdown with no explanation
-        // (the exact symptom seen in production), so surface that case instead.
-        const programs = allPrograms.filter((program) => Boolean(program.price));
-
-        if (allPrograms.length === 0) {
-          throw new Error(
-            "No internship programs are available right now. Please try again later.",
-          );
-        }
-
-        if (programs.length === 0) {
-          throw new Error(
-            "Internship programs are configured but none have a price set. Please contact support.",
-          );
-        }
-
-        // Everything shown here is the program as the dashboard defines it.
-        // The interview link is not: it comes from the enrollment once paid.
-        const nextOptions: FieldOption[] = programs.map((program) => ({
-          programId: program.id,
-          label: program.title || `Program #${program.id}`,
-          description: program.description,
-          price: program.price,
-        }));
-
-        if (!cancelled) {
-          setOptions(nextOptions);
-          if (
-            selection?.programId &&
-            nextOptions.some((option) => option.programId === selection.programId)
-          ) {
-            setProgramId(selection.programId);
-          }
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setOptions([]);
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load internship programs.",
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    if (mode !== "field" || !selection?.programId) return;
+    if (options.some((option) => option.programId === selection.programId)) {
+      setProgramId(selection.programId);
     }
-
-    void loadPrograms();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, selection?.programId]);
+  }, [mode, options, selection?.programId]);
 
   useEffect(() => {
     if (mode !== "link") return;

@@ -6,6 +6,10 @@ import { getPublicDirectusUrl, IS_STATIC_CMS } from "@/lib/config/directus.confi
 import { parseCourseDetailPayload, parseCoursesApiPayload } from "@/lib/laravel/courses";
 import { mapLaravelEventsPayload } from "@/lib/laravel/events";
 import { mapLaravelNewsPayload } from "@/lib/laravel/news";
+import {
+  parseInternshipProgramsPayload,
+  type InternshipProgram,
+} from "@/lib/laravel/internship-programs";
 import { isStaticExportRuntime } from "@/lib/laravel/public-api";
 import {
   normalizeAboutPage,
@@ -27,15 +31,13 @@ import type {
 
 /**
  * Unified RTK Query API (Magico-style).
- * Browser calls use {@link Config.BACK_END_URL} (empty = same-origin BFF,
- * e.g. http://localhost:3001/api/courses — same idea as my-enrollments).
- * Static export has no BFF — hit Laravel `/api/v1/...` instead.
+ * Browser calls use {@link Config.BACK_END_URL} (Railway API host).
+ * Static export hits `/api/v1/...` on the same backend origin.
  */
 const baseQuery = fetchBaseQuery({
   baseUrl: Config.BACK_END_URL,
   prepareHeaders: (headers) => {
     headers.set("Accept", "application/json");
-    headers.set("ngrok-skip-browser-warning", "true");
     return headers;
   },
 });
@@ -76,12 +78,45 @@ const staticCmsError: FetchBaseQueryError = {
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery,
-  tagTypes: ["Courses", "HomePage", "NewsPage", "EventsPage", "AboutPage", "Enrollments"],
+  tagTypes: [
+    "Courses",
+    "HomePage",
+    "NewsPage",
+    "EventsPage",
+    "AboutPage",
+    "Enrollments",
+    "InternshipPrograms",
+  ],
   endpoints: (builder) => ({
     getCourses: builder.query<Course[], void>({
       query: () => laravelPublicPath("/api/courses", "/api/v1/courses"),
       transformResponse: (response: unknown) => parseCoursesApiPayload(response),
       providesTags: ["Courses"],
+    }),
+
+    getInternshipPrograms: builder.query<InternshipProgram[], void>({
+      query: () =>
+        laravelPublicPath(
+          "/api/internship-programs",
+          "/api/internship-programs",
+        ),
+      transformResponse: (response: unknown) =>
+        parseInternshipProgramsPayload(response),
+      providesTags: (result) =>
+        result
+          ? [
+              { type: "InternshipPrograms", id: "LIST" },
+              ...result.map(({ id }) => ({
+                type: "InternshipPrograms" as const,
+                id,
+              })),
+            ]
+          : [{ type: "InternshipPrograms", id: "LIST" }],
+      keepUnusedDataFor: 300,
+      // One network call per session unless tags are invalidated.
+      refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
     }),
 
     getCourseWithLessons: builder.query<CourseWithLessonsResponse, string | number>({
@@ -164,6 +199,8 @@ export const {
   useGetCoursesQuery,
   useGetCourseWithLessonsQuery,
   useEnrollInCourseMutation,
+  useGetInternshipProgramsQuery,
+  useLazyGetInternshipProgramsQuery,
   useGetHomePageQuery,
   useGetNewsPageQuery,
   useGetEventsPageQuery,

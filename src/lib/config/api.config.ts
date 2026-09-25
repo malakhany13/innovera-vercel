@@ -3,16 +3,18 @@ import Config from "@/lib/config/app.config";
 
 /**
  * Public API origin used by the Redux store (RTK Query / browser fetches).
- * Empty = same-origin Next BFF ({@link Config.BACK_END_URL}).
+ * Set via NEXT_PUBLIC_API_BASE_URL / API_BASE_URL (Railway backend).
  */
-export const API_BASE_URL = Config.BACK_END_URL;
+export const API_BASE_URL = Config.BACK_END_URL || Config.API_BASE_URL;
 
 export const API_CONFIG = {
-  /** Browser API base (= Config.BACK_END_URL; empty → localhost:3001 in next-dev). */
+  /** Browser API base (= Config.BACK_END_URL). */
   baseUrl: API_BASE_URL,
   BACK_END_URL: API_BASE_URL,
-  /** Server upstream Laravel host (BFF target). */
-  LARAVEL_API_BASE_URL: Config.LARAVEL_API_BASE_URL,
+  /** Server upstream API host. */
+  API_BASE_URL: Config.API_BASE_URL,
+  /** @deprecated Use API_BASE_URL. */
+  LARAVEL_API_BASE_URL: Config.API_BASE_URL,
   directus: {
     endpoints: {
       homePage: "/items/Home_Page",

@@ -31,8 +31,9 @@ import {
   isInternshipScorePassing,
   type InternshipLevel,
 } from "./constants";
-import { fetchInternshipProgramsClient } from "@/lib/laravel/internship-programs-client";
 import type { InternshipProgram } from "@/lib/laravel/internship-programs";
+import { useGetInternshipProgramsQuery } from "@/store/baseApi";
+import type { LandingTrack, TracksStatus } from "./InternshipLanding";
 
 type Step = "landing" | "form" | "field" | "payment" | "interview" | "preview-passed";
 
@@ -108,17 +109,39 @@ function selectionFromEnrollment(
   };
 }
 
-async function loadInternshipPrograms(): Promise<InternshipProgram[]> {
-  try {
-    return await fetchInternshipProgramsClient();
-  } catch {
-    return [];
-  }
+function tracksFromPrograms(programs: InternshipProgram[]): LandingTrack[] {
+  return programs.map((program) => ({
+    id: program.id,
+    title: program.title,
+    description: program.description,
+    price: program.price,
+    secondPrice: program.secondPrice,
+  }));
 }
 
 export default function Internship() {
   const router = useRouter();
   const { user, ready } = useAuth();
+  // Single page-level subscription — children read props / shared RTK cache.
+  const {
+    data: programs = [],
+    isLoading: programsLoading,
+    isError: programsError,
+    isSuccess: programsSuccess,
+    refetch: refetchPrograms,
+  } = useGetInternshipProgramsQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const tracks = useMemo(() => tracksFromPrograms(programs), [programs]);
+  const tracksStatus: TracksStatus = programsLoading
+    ? "loading"
+    : programsError || !programsSuccess
+      ? "error"
+      : "ready";
+
   const [step, setStep] = useState<Step>("landing");
   const [formValues, setFormValues] = useState<Partial<InternshipFormValues>>({});
   const [fieldSelection, setFieldSelection] =
@@ -143,10 +166,8 @@ export default function Internship() {
     setGate({ status: "loading" });
 
     try {
-      const [enrollments, programs] = await Promise.all([
-        fetchMyEnrollmentsClient(user.token),
-        loadInternshipPrograms(),
-      ]);
+      // Programs come from the page-level RTK query — do not refetch here.
+      const enrollments = await fetchMyEnrollmentsClient(user.token);
       const enrollment = pickEnrollment(enrollments);
 
       if (!enrollment) {
@@ -196,7 +217,7 @@ export default function Internship() {
             : "Unable to check internship payment status.",
       });
     }
-  }, [ready, user?.token]);
+  }, [ready, user?.token, programs]);
 
   useEffect(() => {
     void refreshEnrollmentGate();
@@ -210,32 +231,24 @@ export default function Internship() {
       return;
     }
     if (params.get("trial") !== "2") return;
+    if (programsLoading || programs.length === 0) return;
 
-    let cancelled = false;
+    const wantedId = Number(params.get("program") || "");
+    const program =
+      (Number.isFinite(wantedId)
+        ? programs.find((row) => row.id === wantedId)
+        : null) ?? programs[0];
+    if (!program) return;
 
-    void (async () => {
-      const programs = await loadInternshipPrograms();
-      const wantedId = Number(params.get("program") || "");
-      const program =
-        (Number.isFinite(wantedId)
-          ? programs.find((row) => row.id === wantedId)
-          : null) ?? programs[0];
-      if (!program || cancelled) return;
-
-      setFieldSelection({
-        programId: program.id,
-        title: program.title,
-        price: program.price,
-        secondPrice: program.secondPrice,
-      });
-      setIsSecondTrial(true);
-      setStep("payment");
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setFieldSelection({
+      programId: program.id,
+      title: program.title,
+      price: program.price,
+      secondPrice: program.secondPrice,
+    });
+    setIsSecondTrial(true);
+    setStep("payment");
+  }, [programs, programsLoading]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -536,8 +549,13 @@ export default function Internship() {
     <div className="min-h-screen bg-white">
       <InternshipLanding
         gate={gate}
+        tracks={tracks}
+        tracksStatus={tracksStatus}
         onApply={handleApply}
-        onRefresh={() => void refreshEnrollmentGate()}
+        onRefresh={() => {
+          void refetchPrograms();
+          void refreshEnrollmentGate();
+        }}
       />
     </div>
   );

@@ -9,7 +9,7 @@ function jsonUnavailable(): NextResponse {
     {
       success: false,
       message:
-        "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+        "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
     },
     { status: 503 },
   );
@@ -24,7 +24,7 @@ async function forward(response: Response | null): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: false,
-        message: "Unable to reach the Laravel payment API.",
+        message: "Unable to reach the payment API.",
       },
       { status: 502 },
     );
@@ -37,7 +37,7 @@ async function forward(response: Response | null): Promise<NextResponse> {
       {
         success: false,
         message:
-          "Payment API returned a web page instead of JSON. Check LARAVEL_API_BASE_URL.",
+          "Payment API returned a web page instead of JSON. Check API_BASE_URL.",
       },
       { status: 502 },
     );

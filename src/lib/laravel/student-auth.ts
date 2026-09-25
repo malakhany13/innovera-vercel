@@ -178,7 +178,7 @@ async function postStudentAuth(path: string, body: unknown): Promise<{
 }> {
   if (!hasLaravelBackend()) {
     throw new StudentAuthError(
-      "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+      "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       503,
     );
   }
@@ -213,7 +213,7 @@ async function postStudentAuth(path: string, body: unknown): Promise<{
   }
 
   throw new StudentAuthError(
-    `Unable to reach Laravel student auth API (${LARAVEL_API_BASE_URL || "missing LARAVEL_API_BASE_URL"}): ${describeFetchError(lastError)}. Check that ngrok is running and points to Laravel.`,
+    `Unable to reach student auth API (${LARAVEL_API_BASE_URL || "missing API_BASE_URL"}): ${describeFetchError(lastError)}.`,
     502,
   );
 }

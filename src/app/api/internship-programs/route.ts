@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error:
-          "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+          "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       },
       { status: 503 },
     );

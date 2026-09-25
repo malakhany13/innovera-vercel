@@ -1,11 +1,8 @@
 /**
  * Browser payment API URL builder.
  *
- * next-dev / Node: same-origin `/api/payment/...` so the Next BFF
- * (`src/app/api/payment/[token]`) proxies Laravel — no CORS, no catch-all HTML.
- * Static export: relative (Laravel is the same origin).
- * Override with NEXT_PUBLIC_LARAVEL_API_BASE_URL / NEXT_PUBLIC_PAYMENT_API_BASE_URL
- * only when payment must hit another host from the browser.
+ * Prefers NEXT_PUBLIC_API_BASE_URL (Railway). Falls back to same-origin
+ * `/api/payment/...` (Next BFF) when unset. Static export stays relative.
  */
 export function paymentApiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -19,8 +16,9 @@ export function paymentApiUrl(path: string): string {
   }
 
   const explicit =
-    process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_PAYMENT_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim() ||
     "";
 
   if (explicit) {

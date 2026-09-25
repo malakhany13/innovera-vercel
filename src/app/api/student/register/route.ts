@@ -44,13 +44,13 @@ function parseBody(body: unknown): StudentRegisterPayload | null {
   return payload;
 }
 
-/** BFF: POST /api/student/register → Laravel POST /api/student/register */
+/** BFF: POST /api/student/register → backend POST /api/student/register */
 export async function POST(request: NextRequest) {
   if (!hasLaravelBackend()) {
     return NextResponse.json(
       {
         error:
-          "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+          "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       },
       { status: 503 },
     );

@@ -2,6 +2,8 @@ export {
   useGetCoursesQuery,
   useGetCourseWithLessonsQuery,
   useEnrollInCourseMutation,
+  useGetInternshipProgramsQuery,
+  useLazyGetInternshipProgramsQuery,
   useGetHomePageQuery,
   useGetNewsPageQuery,
   useGetEventsPageQuery,

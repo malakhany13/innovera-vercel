@@ -104,7 +104,7 @@ export function normalizeLaravelEvent(row: LaravelEventRow, index = 0): EventsPa
 async function laravelEventsFetch(path: string): Promise<unknown> {
   if (!hasLaravelBackend()) {
     throw new LaravelEventsError(
-      "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+      "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       503,
     );
   }

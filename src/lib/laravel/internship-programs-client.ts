@@ -1,80 +1,79 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchPublicJson } from "@/lib/laravel/public-api";
+import { useMemo } from "react";
 import {
-  parseInternshipProgramsPayload,
-  type InternshipProgram,
-} from "@/lib/laravel/internship-programs";
+  baseApi,
+  useGetInternshipProgramsQuery,
+} from "@/store/baseApi";
+import { store } from "@/store/store";
+import type { InternshipProgram } from "@/lib/laravel/internship-programs";
+
+const programsQueryOptions = {
+  refetchOnMountOrArgChange: false as const,
+  refetchOnFocus: false as const,
+  refetchOnReconnect: false as const,
+};
 
 /**
- * Live dashboard programs (`price` + `Second_price`).
- * Prefer Magico `/api/internship-programs`, then `/api/v1/...` if that isn't JSON.
+ * Imperative read of the RTK cache (no extra network call when data exists).
+ * Prefer {@link useGetInternshipProgramsQuery} in components.
  */
 export async function fetchInternshipProgramsClient(): Promise<InternshipProgram[]> {
-  const attempts = [
-    {
-      bffPath: "/internship-programs",
-      laravelPath: "/api/internship-programs",
-    },
-    {
-      laravelPath: "/api/v1/internship-programs",
-    },
-  ] as const;
-
-  let lastMessage = "Unable to load internship programs.";
-
-  for (const attempt of attempts) {
-    const result = await fetchPublicJson({
-      ...attempt,
-      errorLabel: "Failed to load internship programs",
-    });
-    if (!result.ok) {
-      lastMessage = result.message;
-      continue;
-    }
-    return parseInternshipProgramsPayload(result.payload);
+  const select = baseApi.endpoints.getInternshipPrograms.select();
+  const cached = select(store.getState());
+  if (cached.status === "fulfilled" && cached.data) {
+    return cached.data;
   }
 
-  throw new Error(lastMessage);
+  const result = await store.dispatch(
+    baseApi.endpoints.getInternshipPrograms.initiate(undefined, {
+      subscribe: false,
+      forceRefetch: false,
+    }),
+  );
+
+  if (result.error) {
+    const err = result.error;
+    const message =
+      typeof err === "object" &&
+      err !== null &&
+      "error" in err &&
+      typeof (err as { error?: unknown }).error === "string"
+        ? (err as { error: string }).error
+        : "Unable to load internship programs.";
+    throw new Error(message);
+  }
+
+  return result.data ?? [];
 }
 
+/** Pick one program from the cached internship-programs list. */
 export function useInternshipProgram(programId: number | null | undefined): {
   program: InternshipProgram | null;
   status: "loading" | "ready" | "error";
 } {
-  const [program, setProgram] = useState<InternshipProgram | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    programId == null ? "error" : "loading",
+  const skip = programId == null;
+  const { data, isLoading, isError, isFetching } = useGetInternshipProgramsQuery(
+    undefined,
+    { skip, ...programsQueryOptions },
   );
 
-  useEffect(() => {
-    if (programId == null) {
-      setProgram(null);
-      setStatus("error");
-      return;
-    }
+  const program = useMemo(() => {
+    if (programId == null || !data) return null;
+    return data.find((row) => row.id === programId) ?? null;
+  }, [data, programId]);
 
-    let cancelled = false;
-    setStatus("loading");
+  if (skip) {
+    return { program: null, status: "error" };
+  }
 
-    void fetchInternshipProgramsClient()
-      .then((programs) => {
-        if (cancelled) return;
-        const match = programs.find((row) => row.id === programId) ?? null;
-        setProgram(match);
-        setStatus(match ? "ready" : "error");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setProgram(null);
-        setStatus("error");
-      });
+  if (isLoading || (isFetching && !data)) {
+    return { program: null, status: "loading" };
+  }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [programId]);
+  if (isError || !program) {
+    return { program: null, status: "error" };
+  }
 
-  return { program, status };
+  return { program, status: "ready" };
 }

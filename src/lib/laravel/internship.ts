@@ -44,7 +44,7 @@ export async function applyInternship(
 ): Promise<EnrollmentPaymentResult> {
   if (!hasLaravelBackend()) {
     throw new LaravelInternshipError(
-      "Laravel API is not configured. Set LARAVEL_API_BASE_URL in .env.local.",
+      "API is not configured. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL in .env.local.",
       503,
     );
   }

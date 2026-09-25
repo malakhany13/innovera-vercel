@@ -293,7 +293,7 @@ export default function PaymentPageClient({ token: tokenProp }: PaymentPageClien
               </li>
               <li>
                 If the API is on another origin, rebuild with{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">NEXT_PUBLIC_LARAVEL_API_BASE_URL</code> set.
+                <code className="text-xs bg-gray-100 px-1 rounded">NEXT_PUBLIC_API_BASE_URL</code> set.
               </li>
               <li>Retry this page, or open a fresh payment link from email.</li>
             </ol>

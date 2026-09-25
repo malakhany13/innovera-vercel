@@ -2,16 +2,14 @@
 
 import { ArrowRight, Loader2, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
 import OptimizedImage from "@/components/ui/OptimizedImage";
-import { fetchInternshipProgramsClient } from "@/lib/laravel/internship-programs-client";
 import {
   formatInternshipFee,
   INTERNSHIP_HERO_IMAGE,
   INTERNSHIP_INTRO,
 } from "./constants";
 
-interface LandingTrack {
+export interface LandingTrack {
   id: number | string;
   title: string;
   description: string;
@@ -21,50 +19,7 @@ interface LandingTrack {
   secondPrice?: string | null;
 }
 
-type TracksStatus = "loading" | "ready" | "error";
-
-/**
- * Track list comes from Laravel internship programs so adding or editing a
- * program in the dashboard shows up without a frontend rebuild.
- * There is deliberately no bundled fallback list: showing tracks the server
- * doesn't offer would let people start an enrollment for a program that isn't
- * open, so a failed load says so instead.
- */
-function useInternshipTracks(): { tracks: LandingTrack[]; status: TracksStatus } {
-  const [tracks, setTracks] = useState<LandingTrack[]>([]);
-  const [status, setStatus] = useState<TracksStatus>("loading");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTracks() {
-      try {
-        const programs = await fetchInternshipProgramsClient();
-        if (cancelled) return;
-        setTracks(
-          programs.map((program) => ({
-            id: program.id,
-            title: program.title,
-            description: program.description,
-            price: program.price,
-            secondPrice: program.secondPrice,
-          })),
-        );
-        setStatus("ready");
-      } catch {
-        if (cancelled) return;
-        setStatus("error");
-      }
-    }
-
-    void loadTracks();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { tracks, status };
-}
+export type TracksStatus = "loading" | "ready" | "error";
 
 type LandingGate =
   | { status: "idle" | "loading" }
@@ -84,6 +39,9 @@ type LandingGate =
 
 interface InternshipLandingProps {
   gate: LandingGate;
+  /** Programs from the parent RTK subscription (fetched once). */
+  tracks: LandingTrack[];
+  tracksStatus: TracksStatus;
   onApply: () => void;
   onRefresh: () => void;
 }
@@ -104,11 +62,12 @@ function ctaLabel(gate: LandingGate): string {
 
 export default function InternshipLanding({
   gate,
+  tracks,
+  tracksStatus,
   onApply,
   onRefresh,
 }: InternshipLandingProps) {
   const checking = gate.status === "loading" || gate.status === "idle";
-  const { tracks, status: tracksStatus } = useInternshipTracks();
   const liveRetakeFee =
     gate.status === "paid" && gate.enrollment.internshipProgramId != null
       ? tracks.find((track) => track.id === gate.enrollment.internshipProgramId)

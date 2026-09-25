@@ -1,18 +1,17 @@
 /**
- * App / API environment config (Magico-style).
+ * App / API environment config.
  *
- * - {@link AppConfig.BACK_END_URL} — browser RTK / client fetches.
- *   Empty string = same-origin Next BFF (e.g. http://localhost:3001/api/...),
- *   matching curls like GET /api/internships/my-enrollments.
- * - {@link AppConfig.LARAVEL_API_BASE_URL} — server-only upstream the BFF
- *   proxies to (env, else production Laravel host).
+ * - {@link AppConfig.BACK_END_URL} — browser RTK / client fetches (Railway in
+ *   this project; empty would mean same-origin Next BFF).
+ * - {@link AppConfig.API_BASE_URL} — server upstream for SSR / BFF proxies
+ *   (same Railway host).
  */
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/$/, "");
 }
 
-/** Same-origin Next BFF paths (browser → localhost:3001 in next-dev). */
+/** Auth path segments under the API base (e.g. …/api/student/login). */
 export interface AuthEndpoints {
   login: string;
   register: string;
@@ -28,27 +27,35 @@ export interface AppConfig {
    * `""` = same-origin (Next BFF on the page host).
    */
   BACK_END_URL: string;
-  /** Server BFF → Laravel upstream. */
+  /** Server-side API origin (SSR / Route Handler upstream). */
+  API_BASE_URL: string;
+  /**
+   * @deprecated Use {@link AppConfig.API_BASE_URL}. Kept so existing imports
+   * keep working during the rename.
+   */
   LARAVEL_API_BASE_URL: string;
   DEPLOYMENT_URL?: string;
   AUTH: AuthEndpoints;
 }
 
-/** Fallback only when no LARAVEL_* / NEXT_PUBLIC_* env is set (server upstream). */
-const DEFAULT_LARAVEL_UPSTREAM = "https://www.innoveracorp.com";
+/** Default backend when no API_* / legacy env is set. */
+const DEFAULT_API_BASE_URL =
+  "https://innovera-testing-production.up.railway.app";
 
 /**
- * Server-side Laravel origin (BFF proxy target).
- * Prefer env: LARAVEL_API_BASE_URL | PAYMENT_API_BASE_URL | NEXT_PUBLIC_LARAVEL_API_BASE_URL.
+ * Shared API origin (browser + server).
+ * Prefer: API_BASE_URL | NEXT_PUBLIC_API_BASE_URL, then legacy LARAVEL_* / PAYMENT_*.
  */
-const LARAVEL_API_BASE_URL = trimTrailingSlash(
-  process.env.LARAVEL_API_BASE_URL?.trim() ||
+const API_BASE_URL = trimTrailingSlash(
+  process.env.API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    process.env.LARAVEL_API_BASE_URL?.trim() ||
     process.env.PAYMENT_API_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim() ||
-    DEFAULT_LARAVEL_UPSTREAM,
+    DEFAULT_API_BASE_URL,
 );
 
-/** Shared auth BFF paths — do not change without updating Route Handlers. */
+/** Shared auth paths — do not change without updating Route Handlers / backend. */
 const AUTH_ENDPOINTS: AuthEndpoints = {
   login: "/api/student/login",
   register: "/api/student/register",
@@ -59,25 +66,29 @@ const AUTH_ENDPOINTS: AuthEndpoints = {
 };
 
 /**
- * Browser base for RTK / client APIs — same-origin BFF (like the my-enrollments curl).
- * Override with NEXT_PUBLIC_API_BASE_URL only if the API is on another origin.
+ * Browser base for RTK / client APIs.
+ * Prefer NEXT_PUBLIC_API_BASE_URL; otherwise same host as {@link API_BASE_URL}.
  */
 function resolveBrowserApiBase(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const fromEnv =
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim();
   if (fromEnv) return trimTrailingSlash(fromEnv);
-  return "";
+  return API_BASE_URL;
 }
 
 const developingAppConfig: AppConfig = {
   BACK_END_URL: resolveBrowserApiBase(),
-  LARAVEL_API_BASE_URL,
+  API_BASE_URL,
+  LARAVEL_API_BASE_URL: API_BASE_URL,
   DEPLOYMENT_URL: "http://localhost:3001",
   AUTH: AUTH_ENDPOINTS,
 };
 
 const productionAppConfig: AppConfig = {
   BACK_END_URL: resolveBrowserApiBase(),
-  LARAVEL_API_BASE_URL,
+  API_BASE_URL,
+  LARAVEL_API_BASE_URL: API_BASE_URL,
   DEPLOYMENT_URL: "https://www.innoveracorp.com",
   AUTH: AUTH_ENDPOINTS,
 };
