@@ -113,10 +113,6 @@ export const baseApi = createApi({
             ]
           : [{ type: "InternshipPrograms", id: "LIST" }],
       keepUnusedDataFor: 300,
-      // One network call per session unless tags are invalidated.
-      refetchOnMountOrArgChange: false,
-      refetchOnFocus: false,
-      refetchOnReconnect: false,
     }),
 
     getCourseWithLessons: builder.query<CourseWithLessonsResponse, string | number>({
