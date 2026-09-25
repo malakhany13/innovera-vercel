@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -119,12 +119,14 @@ function tracksFromPrograms(programs: InternshipProgram[]): LandingTrack[] {
   }));
 }
 
+const EMPTY_PROGRAMS: InternshipProgram[] = [];
+
 export default function Internship() {
   const router = useRouter();
   const { user, ready } = useAuth();
   // Single page-level subscription — children read props / shared RTK cache.
   const {
-    data: programs = [],
+    data,
     isLoading: programsLoading,
     isError: programsError,
     isSuccess: programsSuccess,
@@ -134,6 +136,11 @@ export default function Internship() {
     refetchOnFocus: false,
     refetchOnReconnect: false,
   });
+  // Stable fallback — `data ?? []` would allocate a new array every render and
+  // retrigger effects that depend on `programs`.
+  const programs = data ?? EMPTY_PROGRAMS;
+  const programsRef = useRef(programs);
+  programsRef.current = programs;
 
   const tracks = useMemo(() => tracksFromPrograms(programs), [programs]);
   const tracksStatus: TracksStatus = programsLoading
@@ -149,6 +156,7 @@ export default function Internship() {
   const [paymentToken, setPaymentToken] = useState<string | null>(null);
   const [isSecondTrial, setIsSecondTrial] = useState(false);
   const [gate, setGate] = useState<EnrollmentGate>({ status: "idle" });
+  const trialAppliedRef = useRef(false);
 
   const authDefaults = useMemo(() => authToInternshipDefaults(user), [user]);
 
@@ -166,7 +174,8 @@ export default function Internship() {
     setGate({ status: "loading" });
 
     try {
-      // Programs come from the page-level RTK query — do not refetch here.
+      // Programs come from the page-level RTK query — read via ref so this
+      // callback does not recreate when `programs` identity changes.
       const enrollments = await fetchMyEnrollmentsClient(user.token);
       const enrollment = pickEnrollment(enrollments);
 
@@ -176,7 +185,9 @@ export default function Internship() {
       }
 
       const program =
-        programs.find((row) => row.id === enrollment.internshipProgramId) ?? null;
+        programsRef.current.find(
+          (row) => row.id === enrollment.internshipProgramId,
+        ) ?? null;
       const selection = selectionFromEnrollment(enrollment, program);
       const paid =
         isInternshipPaid(enrollment.internshipPaymentStatus) ||
@@ -217,16 +228,60 @@ export default function Internship() {
             : "Unable to check internship payment status.",
       });
     }
-  }, [ready, user?.token, programs]);
+  }, [ready, user?.token]);
 
   useEffect(() => {
     void refreshEnrollmentGate();
   }, [refreshEnrollmentGate]);
 
+  // When programs arrive after the gate resolved, backfill fee fields once.
   useEffect(() => {
+    if (!data?.length) return;
+
+    setGate((prev) => {
+      if (prev.status !== "pending" && prev.status !== "paid") return prev;
+      const program =
+        data.find((row) => row.id === prev.enrollment.internshipProgramId) ??
+        null;
+      if (!program) return prev;
+      const selection = selectionFromEnrollment(prev.enrollment, program);
+      if (
+        selection.price === prev.selection.price &&
+        selection.secondPrice === prev.selection.secondPrice &&
+        selection.title === prev.selection.title
+      ) {
+        return prev;
+      }
+      return { ...prev, selection };
+    });
+
+    setFieldSelection((prev) => {
+      if (!prev) return prev;
+      const program = data.find((row) => row.id === prev.programId) ?? null;
+      if (!program) return prev;
+      const title = program.title || prev.title;
+      if (
+        program.price === prev.price &&
+        program.secondPrice === prev.secondPrice &&
+        title === prev.title
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        title,
+        price: program.price,
+        secondPrice: program.secondPrice,
+      };
+    });
+  }, [data]);
+
+  useEffect(() => {
+    if (trialAppliedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const preview = params.get("preview");
     if (preview === "passed") {
+      trialAppliedRef.current = true;
       setStep("preview-passed");
       return;
     }
@@ -240,6 +295,7 @@ export default function Internship() {
         : null) ?? programs[0];
     if (!program) return;
 
+    trialAppliedRef.current = true;
     setFieldSelection({
       programId: program.id,
       title: program.title,
