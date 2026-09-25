@@ -1,9 +1,6 @@
-/**
- * Browser payment API URL builder.
- *
- * Prefers NEXT_PUBLIC_API_BASE_URL (Railway). Falls back to same-origin
- * `/api/payment/...` (Next BFF) when unset. Static export stays relative.
- */
+import Config from "@/lib/config/app.config";
+
+
 export function paymentApiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
 
@@ -15,23 +12,21 @@ export function paymentApiUrl(path: string): string {
     return normalized;
   }
 
-  const explicit =
+  const base =
     process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_PAYMENT_API_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_LARAVEL_API_BASE_URL?.trim() ||
+    Config.BACK_END_URL?.trim() ||
     "";
 
-  if (explicit) {
-    return `${explicit.replace(/\/$/, "")}${normalized}`;
+  if (base) {
+    return `${base.replace(/\/$/, "")}${normalized}`;
   }
 
   return normalized;
 }
 
-/**
- * Turn a Laravel `payment_show_url` (often absolute with APP_URL) into a
- * same-origin path like `/payment/{token}` for client navigation.
- */
+
 export function toRelativePaymentPagePath(urlOrPath: string): string | null {
   const raw = urlOrPath.trim();
   if (!raw) return null;

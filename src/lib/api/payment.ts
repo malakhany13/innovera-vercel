@@ -101,10 +101,10 @@ function extractRedirectUrl(payload: PaymentRedirectResponse): string {
   return url;
 }
 
-/** Same-origin Next BFF (`src/app/api/payment/[token]`), then Laravel. */
+/** Railway payment API via {@link paymentApiUrl}. */
 async function paymentFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(paymentApiUrl(path), {
-    credentials: "include",
+    credentials: "omit",
     cache: "no-store",
     ...init,
     headers: {
