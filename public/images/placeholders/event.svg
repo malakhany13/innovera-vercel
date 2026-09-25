@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" fill="none">
+  <defs>
+    <linearGradient id="eventBg" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0a2748"/>
+      <stop offset="1" stop-color="#003f83"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#eventBg)"/>
+  <circle cx="180" cy="140" r="200" fill="#3dc0c8" fill-opacity="0.12"/>
+  <circle cx="1040" cy="660" r="210" fill="#3dc0c8" fill-opacity="0.1"/>
+  <rect x="470" y="240" width="260" height="240" rx="24" fill="white" fill-opacity="0.08" stroke="#3dc0c8" stroke-opacity="0.45" stroke-width="4"/>
+  <rect x="510" y="280" width="180" height="28" rx="8" fill="#3dc0c8" fill-opacity="0.85"/>
+  <circle cx="560" cy="370" r="10" fill="#3dc0c8"/>
+  <circle cx="600" cy="370" r="10" fill="#3dc0c8"/>
+  <circle cx="640" cy="370" r="10" fill="#3dc0c8"/>
+  <path d="M520 430h160" stroke="#3dc0c8" stroke-opacity="0.7" stroke-width="12" stroke-linecap="round"/>
+  <text x="600" y="580" text-anchor="middle" fill="white" fill-opacity="0.9" font-family="Arial, sans-serif" font-size="42" font-weight="700">Innovera Events</text>
+</svg>

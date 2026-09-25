@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 200" role="img" aria-label="courses by innovera">
+  <rect width="560" height="200" fill="#f3f5f7"/>
+  <text
+    x="280"
+    y="95"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial, Helvetica, sans-serif"
+    font-size="78"
+    font-weight="700"
+    letter-spacing="-1.5"
+    fill="#0a2342"
+  >courses</text>
+  <text
+    x="390"
+    y="145"
+    text-anchor="end"
+    font-family="Segoe UI, Arial, Helvetica, sans-serif"
+    font-size="30"
+    font-weight="600"
+    fill="#0a2342"
+  >
+    <tspan fill="#0a2342">by inno</tspan>
+    <tspan fill="#00c4cc">v</tspan>
+    <tspan fill="#0a2342">era</tspan>
+  </text>
+</svg>

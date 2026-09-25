@@ -1,0 +1,49 @@
+{
+  "name": "innovera-next",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "dev:turbo": "next dev -p 3001",
+    "dev:webpack": "next dev --webpack -p 3001",
+    "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev -p 3001",
+    "build": "next build",
+    "build:static": "node scripts/build-static.mjs",
+    "deploy:laravel": "node scripts/deploy-to-laravel.mjs",
+    "download:cms-assets": "tsx scripts/download-cms-assets.ts",
+    "analyze": "next build --webpack",
+    "start": "next start -p 3001",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.5.0",
+    "@reduxjs/toolkit": "^2.12.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "embla-carousel-react": "^8.6.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.40.0",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "react-redux": "^9.3.0",
+    "recharts": "^3.9.0",
+    "shadcn": "^4.11.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.9",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.1",
+    "typescript": "^5"
+  }
+}
