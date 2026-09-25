@@ -11,8 +11,8 @@
     "build:static": "node scripts/build-static.mjs",
     "deploy:laravel": "node scripts/deploy-to-laravel.mjs",
     "download:cms-assets": "tsx scripts/download-cms-assets.ts",
-    "analyze": "next build --webpack",
     "start": "next start -p 3001",
+    "analyze": "next build --webpack",
     "lint": "eslint"
   },
   "dependencies": {
