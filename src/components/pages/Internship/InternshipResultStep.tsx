@@ -66,6 +66,33 @@ export default function InternshipResultStep({
 
       <section className="relative z-10 max-w-2xl mx-auto px-6 -mt-20 sm:-mt-28 pb-20">
         <div className="bg-white rounded-[1.75rem] shadow-[0_16px_50px_-12px_rgba(15,23,42,0.18)] border border-slate-100 px-6 sm:px-10 py-8 sm:py-10">
+          {showShortCourse ? (
+            <div className="text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-brand-cyan/10">
+                <GraduationCap className="h-8 w-8 text-brand-cyan" aria-hidden />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-800 leading-snug mb-3">
+                You&apos;re on the list
+              </h2>
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-md mx-auto">
+                You have enrolled in a free of charge short course in your field
+                {programTitle?.trim() ? (
+                  <>
+                    {" "}
+                    (
+                    <span className="font-semibold text-slate-800">{fieldLabel}</span>
+                    )
+                  </>
+                ) : null}
+                .
+              </p>
+              <p className="mt-4 text-sm text-slate-500 leading-relaxed max-w-md mx-auto">
+                Both AI interview attempts for this internship are complete, so there
+                is no further payment or retake.
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="flex flex-col sm:flex-row sm:items-start gap-6 mb-8">
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-800 leading-snug mb-4">
@@ -76,25 +103,7 @@ export default function InternshipResultStep({
                   <span className="text-emerald-600">(Passed)</span>
                 )}
               </h2>
-              {showShortCourse ? (
-                <div className="space-y-3 text-sm text-slate-600 leading-relaxed">
-                  <p>
-                    You didn&apos;t pass the AI interview after both attempts for{" "}
-                    <span className="font-semibold text-slate-800">{fieldLabel}</span>.
-                  </p>
-                  <p className="rounded-xl border border-brand-cyan/20 bg-brand-cyan/5 px-4 py-3 text-slate-700">
-                    <span className="inline-flex items-center gap-2 font-semibold text-brand-navy">
-                      <GraduationCap className="h-4 w-4 text-brand-cyan" aria-hidden />
-                      Free short course enrollment
-                    </span>
-                    <span className="mt-2 block">
-                      You have been enrolled in a free of charge short course in{" "}
-                      <span className="font-semibold">{fieldLabel}</span> to help bridge
-                      the skill gaps identified in your interview.
-                    </span>
-                  </p>
-                </div>
-              ) : failed ? (
+              {failed ? (
                 <div className="space-y-3 text-sm text-slate-600 leading-relaxed">
                   <p>
                     Unfortunately, you didn&apos;t pass this time. You can retry the
@@ -150,16 +159,18 @@ export default function InternshipResultStep({
             </div>
           </div>
 
-          {showShortCourse ? null : failed ? (
+          {failed ? (
             <button
               type="button"
               onClick={() => onRetryPayment?.()}
               className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold shadow-lg shadow-brand-cyan/20 hover:bg-cyan-500 transition-colors"
             >
-              Retry
+              Retry payment
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : null}
+          </>
+          )}
         </div>
       </section>
     </div>

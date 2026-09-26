@@ -92,3 +92,18 @@ export function isInternshipAttemptsExhausted(
     : 2;
   return used >= max;
 }
+
+/**
+ * The second trial counts as paid only after a successful payment and a
+ * recorded second attempt. A first-trial payment, or a retake that is still
+ * unpaid, does not qualify.
+ */
+export function isSecondTrialPaid(
+  enrollment: Pick<
+    InternshipEnrollment,
+    "attemptsUsed" | "internshipPaymentStatus"
+  >,
+): boolean {
+  if (!isInternshipPaid(enrollment.internshipPaymentStatus)) return false;
+  return enrollment.attemptsUsed != null && enrollment.attemptsUsed >= 2;
+}

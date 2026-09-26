@@ -9,9 +9,9 @@ import Config from "@/lib/config/app.config";
 import { studentAuthHeaders } from "@/lib/auth/student-headers";
 import {
   isInternshipInterviewFailed,
+  isSecondTrialPaid,
   isInternshipInterviewPassed,
   isInternshipPaid,
-  type InternshipEnrollment,
 } from "@/lib/laravel/internship-enrollment-status";
 import { parseInternshipEnrollmentsPayload } from "@/lib/laravel/internship-enrollments";
 import {
@@ -46,6 +46,8 @@ interface InternshipInterviewStepProps {
   onBackToPayment?: () => void;
   /** Link mode: interviewer failed → retry payment (PayTabs / Fawry). */
   onRetryPayment?: () => void;
+  /** Both attempts already used — hide retry payment and show the short course page. */
+  attemptsExhausted?: boolean;
   /** Link mode: finished after opening / confirming interview. */
   onDone?: () => void;
 }
@@ -55,6 +57,15 @@ interface FieldOption {
   label: string;
   description: string;
   price: string;
+}
+
+function feesMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = Number(String(left ?? "").replace(/,/g, ""));
+  const b = Number(String(right ?? "").replace(/,/g, ""));
+  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && a === b;
 }
 
 const fieldClass =
@@ -67,6 +78,7 @@ export default function InternshipInterviewStep({
   onBackToPayment,
   onRetryPayment,
   onDone,
+  attemptsExhausted = false,
 }: InternshipInterviewStepProps) {
   const { user, ready: authReady, logout } = useAuth();
   const [programId, setProgramId] = useState<number | "">(
@@ -83,6 +95,9 @@ export default function InternshipInterviewStep({
     null,
   );
   const [score, setScore] = useState<{ total: number; max: number } | null>(null);
+  const [attemptsExhaustedLocal, setAttemptsExhaustedLocal] = useState(false);
+  const [enrollmentCost, setEnrollmentCost] = useState<string | null>(null);
+  const [enrollmentPaid, setEnrollmentPaid] = useState(false);
   const [continuing, setContinuing] = useState(false);
 
   const {
@@ -156,6 +171,9 @@ export default function InternshipInterviewStep({
       setEnrollmentInterviewUrl(null);
       setInterviewerStatus(null);
       setScore(null);
+      setAttemptsExhaustedLocal(false);
+      setEnrollmentCost(null);
+      setEnrollmentPaid(false);
 
       if (!user?.token) {
         if (!cancelled) {
@@ -213,6 +231,11 @@ export default function InternshipInterviewStep({
           setEnrollmentProgramTitle(match?.internshipProgramTitle?.trim() || null);
           setInterviewerStatus(interviewer);
           setScore(matchedScore);
+          setEnrollmentCost(match?.internshipCost ?? null);
+          setEnrollmentPaid(
+            match != null && isInternshipPaid(match.internshipPaymentStatus),
+          );
+          setAttemptsExhaustedLocal(match != null && isSecondTrialPaid(match));
           if (!paid) {
             setPaymentError(
               match
@@ -226,6 +249,9 @@ export default function InternshipInterviewStep({
           setHasPaid(false);
           setEnrollmentInterviewUrl(null);
           setInterviewerStatus(null);
+          setAttemptsExhaustedLocal(false);
+          setEnrollmentCost(null);
+          setEnrollmentPaid(false);
           setPaymentError(
             error instanceof Error
               ? error.message
@@ -264,6 +290,15 @@ export default function InternshipInterviewStep({
     score != null
       ? !isInternshipScorePassing(score.total, score.max)
       : interviewerStatus != null && isInternshipInterviewFailed(interviewerStatus);
+  const paidRetakeFee =
+    enrollmentPaid &&
+    Boolean(liveProgram?.secondPrice) &&
+    !feesMatch(liveProgram?.price, liveProgram?.secondPrice) &&
+    feesMatch(enrollmentCost, liveProgram?.secondPrice);
+  const showAttemptsExhausted =
+    interviewFailed && (attemptsExhausted || attemptsExhaustedLocal || paidRetakeFee);
+  const resultProgramTitle =
+    enrollmentProgramTitle || selection?.title || null;
 
   if (mode === "link" && !paymentChecking && interviewPassed) {
     return (
@@ -279,9 +314,13 @@ export default function InternshipInterviewStep({
     return (
       <InternshipResultStep
         outcome="failed"
-        feeAmount={liveProgram?.secondPrice}
-        score={score}
-        onRetryPayment={onRetryPayment ?? onBackToPayment}
+        feeAmount={showAttemptsExhausted ? null : liveProgram?.secondPrice}
+        score={showAttemptsExhausted ? null : score}
+        programTitle={resultProgramTitle}
+        attemptsExhausted={showAttemptsExhausted}
+        onRetryPayment={
+          showAttemptsExhausted ? undefined : (onRetryPayment ?? onBackToPayment)
+        }
       />
     );
   }

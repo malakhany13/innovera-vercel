@@ -34,6 +34,24 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
+function readAttemptsUsed(record: Record<string, unknown>): number | null {
+  const numeric =
+    asNumber(record.attempts_used) ??
+    asNumber(record.attemptsUsed) ??
+    asNumber(record.attempts_count) ??
+    asNumber(record.attemptsCount) ??
+    asNumber(record.used_attempts) ??
+    asNumber(record.usedAttempts) ??
+    asNumber(record.interview_attempts_count) ??
+    asNumber(record.interviewAttemptsCount) ??
+    asNumber(record.attempt_count) ??
+    asNumber(record.attemptCount);
+  if (numeric != null) return numeric;
+  if (Array.isArray(record.attempts)) return record.attempts.length;
+  if (Array.isArray(record.interview_attempts)) return record.interview_attempts.length;
+  return null;
+}
+
 function parseEnrollment(value: unknown): InternshipEnrollment | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -97,10 +115,14 @@ function parseEnrollment(value: unknown): InternshipEnrollment | null {
     totalScore: asNumber(record.total_score) ?? asNumber(record.totalScore),
     totalScoreMax:
       asNumber(record.total_score_max) ?? asNumber(record.totalScoreMax),
-    attemptsUsed:
-      asNumber(record.attempts_used) ?? asNumber(record.attemptsUsed),
+    attemptsUsed: readAttemptsUsed(record),
     maxAttempts:
-      asNumber(record.max_attempts) ?? asNumber(record.maxAttempts),
+      asNumber(record.max_attempts) ??
+      asNumber(record.maxAttempts) ??
+      asNumber(record.attempts_limit) ??
+      asNumber(record.attemptsLimit) ??
+      asNumber(record.allowed_attempts) ??
+      asNumber(record.allowedAttempts),
     createdAt:
       asTrimmedString(record.created_at) ?? asTrimmedString(record.createdAt),
     updatedAt:

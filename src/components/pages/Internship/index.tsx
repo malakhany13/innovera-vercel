@@ -13,6 +13,7 @@ import {
   formatInterviewerStatusLabel,
   formatPaymentStatusLabel,
   isInternshipInterviewFailed,
+  isSecondTrialPaid,
   isInternshipInterviewPassed,
   isInternshipPaid,
   type InternshipEnrollment,
@@ -35,7 +36,14 @@ import type { InternshipProgram } from "@/lib/laravel/internship-programs";
 import { useGetInternshipProgramsQuery } from "@/store/baseApi";
 import type { LandingTrack, TracksStatus } from "./InternshipLanding";
 
-type Step = "landing" | "form" | "field" | "payment" | "interview" | "preview-passed";
+type Step =
+  | "landing"
+  | "form"
+  | "field"
+  | "payment"
+  | "interview"
+  | "short-course"
+  | "preview-passed";
 
 type EnrollmentGate =
   | { status: "idle" | "loading" }
@@ -48,8 +56,120 @@ type EnrollmentGate =
       paymentLabel: string;
       interviewerLabel: string;
       interviewOutcome: "passed" | "failed" | "pending";
+      /**
+       * Paid the second trial and did not pass. Unpaid retakes and passing
+       * results never set this.
+       */
+      attemptsExhausted: boolean;
     }
   | { status: "error"; message: string };
+
+const SECOND_TRIAL_FAILED_PREFIX = "innovera:internship-second-trial-failed:";
+
+function secondTrialFailedKey(email: string | null | undefined): string | null {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return null;
+  return `${SECOND_TRIAL_FAILED_PREFIX}${normalized}`;
+}
+
+function readSecondTrialFailedIds(email: string | null | undefined): number[] {
+  if (typeof window === "undefined") return [];
+  const key = secondTrialFailedKey(email);
+  if (!key) return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (id): id is number => typeof id === "number" && Number.isFinite(id),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function rememberSecondTrialFailed(
+  email: string | null | undefined,
+  programId: number,
+) {
+  if (typeof window === "undefined" || !Number.isFinite(programId) || programId <= 0) {
+    return;
+  }
+  const key = secondTrialFailedKey(email);
+  if (!key) return;
+  const current = readSecondTrialFailedIds(email);
+  if (current.includes(programId)) return;
+  window.localStorage.setItem(key, JSON.stringify([...current, programId]));
+}
+
+function forgetSecondTrialFailed(
+  email: string | null | undefined,
+  programId: number,
+) {
+  if (typeof window === "undefined") return;
+  const key = secondTrialFailedKey(email);
+  if (!key) return;
+  const next = readSecondTrialFailedIds(email).filter((id) => id !== programId);
+  window.localStorage.setItem(key, JSON.stringify(next));
+}
+
+function interviewOutcomeFromEnrollment(
+  enrollment: InternshipEnrollment,
+): "passed" | "failed" | "pending" {
+  if (enrollment.totalScore != null && enrollment.totalScoreMax != null) {
+    return isInternshipScorePassing(enrollment.totalScore, enrollment.totalScoreMax)
+      ? "passed"
+      : "failed";
+  }
+  if (isInternshipInterviewPassed(enrollment.interviewerStatus)) return "passed";
+  if (isInternshipInterviewFailed(enrollment.interviewerStatus)) return "failed";
+  return "pending";
+}
+
+function amountsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = Number(String(left ?? "").replace(/,/g, ""));
+  const b = Number(String(right ?? "").replace(/,/g, ""));
+  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && a === b;
+}
+
+/**
+ * The recorded fee is the retake price (for example 100 EGP), not the first-trial
+ * price. Same price for both trials is ignored so a first payment is not treated
+ * as the second.
+ */
+function paidRetakeFee(
+  enrollment: InternshipEnrollment,
+  program: { price?: string | null; secondPrice?: string | null } | null,
+): boolean {
+  const retake = program?.secondPrice;
+  if (!retake) return false;
+  if (amountsEqual(program?.price, retake)) return false;
+  return amountsEqual(enrollment.internshipCost, retake);
+}
+
+/**
+ * Short course page only after a paid second trial that was not passed.
+ * A first failure still offers retake payment. A pass never qualifies.
+ */
+function isShortCourseEnrollment(
+  enrollment: InternshipEnrollment,
+  email?: string | null,
+  program?: { price?: string | null; secondPrice?: string | null } | null,
+): boolean {
+  if (!isInternshipPaid(enrollment.internshipPaymentStatus)) return false;
+  if (interviewOutcomeFromEnrollment(enrollment) !== "failed") return false;
+  if (isSecondTrialPaid(enrollment) || paidRetakeFee(enrollment, program ?? null)) {
+    return true;
+  }
+  return readSecondTrialFailedIds(email).includes(enrollment.internshipProgramId);
+}
+
+function isAttemptsLimitResponse(status: number, message: string): boolean {
+  if (/already used all\s+\d+\s+attempts/i.test(message)) return true;
+  return status === 422 && /attempt/i.test(message);
+}
 
 function isInternshipLevel(value: string): value is InternshipLevel {
   return (INTERNSHIP_LEVELS as readonly string[]).includes(value);
@@ -193,19 +313,20 @@ export default function Internship() {
         isInternshipPaid(enrollment.internshipPaymentStatus) ||
         Boolean(enrollment.interviewUrl);
 
-      const interviewOutcome =
-        enrollment.totalScore != null && enrollment.totalScoreMax != null
-          ? isInternshipScorePassing(
-              enrollment.totalScore,
-              enrollment.totalScoreMax,
-            )
-            ? "passed"
-            : "failed"
-          : isInternshipInterviewPassed(enrollment.interviewerStatus)
-            ? "passed"
-            : isInternshipInterviewFailed(enrollment.interviewerStatus)
-              ? "failed"
-              : "pending";
+      const interviewOutcome = interviewOutcomeFromEnrollment(enrollment);
+      if (interviewOutcome === "passed") {
+        forgetSecondTrialFailed(user.email, enrollment.internshipProgramId);
+      } else if (
+        isSecondTrialPaid(enrollment) ||
+        paidRetakeFee(enrollment, program)
+      ) {
+        rememberSecondTrialFailed(user.email, enrollment.internshipProgramId);
+      }
+      const attemptsExhausted = isShortCourseEnrollment(
+        enrollment,
+        user.email,
+        program,
+      );
 
       setGate({
         status: paid ? "paid" : "pending",
@@ -216,6 +337,7 @@ export default function Internship() {
           enrollment.interviewerStatus,
         ),
         interviewOutcome,
+        attemptsExhausted,
       });
       setFieldSelection(selection);
       setPaymentToken(enrollment.paymentToken);
@@ -228,7 +350,7 @@ export default function Internship() {
             : "Unable to check internship payment status.",
       });
     }
-  }, [ready, user?.token]);
+  }, [ready, user?.email, user?.token]);
 
   useEffect(() => {
     void refreshEnrollmentGate();
@@ -283,6 +405,11 @@ export default function Internship() {
     if (preview === "passed") {
       trialAppliedRef.current = true;
       setStep("preview-passed");
+      return;
+    }
+    if (preview === "short-course") {
+      trialAppliedRef.current = true;
+      setStep("short-course");
       return;
     }
     if (params.get("trial") !== "2") return;
@@ -349,16 +476,30 @@ export default function Internship() {
       if (!enrollResponse.ok && !token) {
         const message = enrollPayload?.error || enrollPayload?.message || "";
 
-        // Attempts exhausted (422, "You have already used all N attempts…") has
-        // no valid payment step to retry into — sending the user to a payment UI
-        // with no token would just look broken. Surface the real reason and stay
-        // put instead.
-        if (enrollResponse.status === 422 && /attempt/i.test(message)) {
+        // Both attempts are used. After a paid second trial that failed, there
+        // is no further payment — only the short-course confirmation.
+        if (isAttemptsLimitResponse(enrollResponse.status, message)) {
+          const enrollments = await fetchMyEnrollmentsClient(user.token);
+          const enrollment =
+            enrollments.find((row) => row.internshipProgramId === programId) ??
+            null;
+          const failedAndPaid =
+            enrollment != null &&
+            isInternshipPaid(enrollment.internshipPaymentStatus) &&
+            interviewOutcomeFromEnrollment(enrollment) === "failed";
+          if (failedAndPaid && enrollment) {
+            rememberSecondTrialFailed(user.email, programId);
+            const program =
+              programsRef.current.find((row) => row.id === programId) ?? null;
+            setFieldSelection(selectionFromEnrollment(enrollment, program));
+            setStep("short-course");
+            void refreshEnrollmentGate();
+            return;
+          }
           toast.error(
             message ||
               "You have used all available attempts for this internship program.",
           );
-          void refreshEnrollmentGate();
           return;
         }
 
@@ -390,6 +531,10 @@ export default function Internship() {
       setPaymentToken(gate.enrollment.paymentToken);
 
       if (gate.interviewOutcome === "failed") {
+        if (gate.attemptsExhausted) {
+          setStep("short-course");
+          return;
+        }
         void startRetryPayment(gate.selection.programId);
         return;
       }
@@ -522,11 +667,29 @@ export default function Internship() {
                   : "";
 
               if (!enrollResponse.ok || !token) {
-                throw new Error(
+                const message =
                   enrollPayload?.error ||
-                    enrollPayload?.message ||
-                    "Failed to enroll in internship program.",
-                );
+                  enrollPayload?.message ||
+                  "Failed to enroll in internship program.";
+                if (isAttemptsLimitResponse(enrollResponse.status, message)) {
+                  const enrollments = await fetchMyEnrollmentsClient(user.token);
+                  const enrollment =
+                    enrollments.find(
+                      (row) => row.internshipProgramId === next.programId,
+                    ) ?? null;
+                  if (
+                    enrollment &&
+                    isInternshipPaid(enrollment.internshipPaymentStatus) &&
+                    interviewOutcomeFromEnrollment(enrollment) === "failed"
+                  ) {
+                    rememberSecondTrialFailed(user.email, next.programId);
+                    setFieldSelection(next);
+                    setStep("short-course");
+                    return;
+                  }
+                  throw new Error(message);
+                }
+                throw new Error(message);
               }
 
               setPaymentToken(token);
@@ -581,6 +744,29 @@ export default function Internship() {
     );
   }
 
+  const shortCourseActive =
+    gate.status === "paid" &&
+    gate.interviewOutcome === "failed" &&
+    gate.attemptsExhausted;
+  const shortCourseTitle =
+    fieldSelection?.title?.trim() ||
+    (gate.status === "paid" || gate.status === "pending"
+      ? gate.enrollment.internshipProgramTitle
+      : "") ||
+    null;
+
+  if (step === "short-course" || (step === "landing" && shortCourseActive)) {
+    return (
+      <div className="min-h-screen bg-white">
+        <InternshipResultStep
+          outcome="failed"
+          attemptsExhausted
+          programTitle={shortCourseTitle}
+        />
+      </div>
+    );
+  }
+
   if (step === "interview") {
     return (
       <div className="min-h-screen bg-white">
@@ -588,7 +774,12 @@ export default function Internship() {
           mode="link"
           selection={fieldSelection}
           onBackToPayment={() => setStep("payment")}
+          attemptsExhausted={shortCourseActive}
           onRetryPayment={() => {
+            if (shortCourseActive) {
+              setStep("short-course");
+              return;
+            }
             if (!fieldSelection?.programId) {
               setStep("payment");
               return;

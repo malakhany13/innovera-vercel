@@ -30,6 +30,7 @@ type LandingGate =
       paymentLabel: string;
       interviewerLabel: string;
       interviewOutcome: "passed" | "failed" | "pending";
+      attemptsExhausted?: boolean;
       enrollment: {
         internshipProgramTitle: string;
         internshipProgramId?: number;
@@ -53,6 +54,7 @@ function ctaLabel(gate: LandingGate): string {
     return "View your result";
   }
   if (gate.status === "paid" && gate.interviewOutcome === "failed") {
+    if (gate.attemptsExhausted) return "View your short course";
     return "Retry payment";
   }
   if (gate.status === "paid") return "Continue to AI interview";
@@ -136,6 +138,22 @@ export default function InternshipLanding({
                       </p>
                       <p className="text-sm text-slate-600">
                         {gate.enrollment.internshipProgramTitle}. {gate.interviewerLabel}.
+                      </p>
+                    </div>
+                  ) : gate.status === "paid" &&
+                    gate.interviewOutcome === "failed" &&
+                    gate.attemptsExhausted ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-brand-navy">
+                        You&apos;re on the list
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        You have enrolled in a free of charge short course in your
+                        field
+                        {gate.enrollment.internshipProgramTitle
+                          ? ` (${gate.enrollment.internshipProgramTitle})`
+                          : ""}
+                        .
                       </p>
                     </div>
                   ) : gate.status === "paid" && gate.interviewOutcome === "failed" ? (
