@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Calendar, Clock, GraduationCap, Mail, Phone, User } from "lucide-react";
 import { motion } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import OptimizedImage from "@/components/ui/OptimizedImage";
@@ -613,8 +614,18 @@ export default function TrainingCourseEnrollPage({ course }: TrainingCourseEnrol
                       required
                       className="mt-0.5 size-4 rounded border-slate-300 text-brand-cyan focus:ring-brand-cyan/20"
                     />
-                    <span className="text-sm text-slate-600">
-                      I agree to the terms and consent to Innovera contacting me about this enrollment.
+                    <span className="text-sm text-slate-600 leading-relaxed">
+                      I agree to the{" "}
+                      <Link
+                        href="/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-brand-cyan hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        terms and conditions
+                      </Link>{" "}
+                      and consent to Innovera contacting me about this enrollment.
                     </span>
                   </label>
 
