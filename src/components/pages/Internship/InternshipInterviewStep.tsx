@@ -10,7 +10,6 @@ import Config from "@/lib/config/app.config";
 import { studentAuthHeaders } from "@/lib/auth/student-headers";
 import {
   isInternshipInterviewFailed,
-  isSecondTrialPaid,
   isInternshipInterviewPassed,
   isInternshipPaid,
 } from "@/lib/laravel/internship-enrollment-status";
@@ -64,15 +63,6 @@ interface FieldOption {
   price: string;
 }
 
-function feesMatch(
-  left: string | null | undefined,
-  right: string | null | undefined,
-): boolean {
-  const a = Number(String(left ?? "").replace(/,/g, ""));
-  const b = Number(String(right ?? "").replace(/,/g, ""));
-  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && a === b;
-}
-
 const fieldClass =
   "w-full rounded-xl bg-slate-100 border border-transparent px-4 py-3.5 text-sm text-slate-800 outline-none focus:bg-white focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 transition appearance-none";
 
@@ -103,8 +93,6 @@ export default function InternshipInterviewStep({
   );
   const [score, setScore] = useState<{ total: number; max: number } | null>(null);
   const [attemptsExhaustedLocal, setAttemptsExhaustedLocal] = useState(false);
-  const [enrollmentCost, setEnrollmentCost] = useState<string | null>(null);
-  const [enrollmentPaid, setEnrollmentPaid] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<InternshipFieldSelection | null>(
     null,
@@ -182,8 +170,6 @@ export default function InternshipInterviewStep({
       setInterviewerStatus(null);
       setScore(null);
       setAttemptsExhaustedLocal(false);
-      setEnrollmentCost(null);
-      setEnrollmentPaid(false);
 
       if (!user?.token) {
         if (!cancelled) {
@@ -241,11 +227,29 @@ export default function InternshipInterviewStep({
           setEnrollmentProgramTitle(match?.internshipProgramTitle?.trim() || null);
           setInterviewerStatus(interviewer);
           setScore(matchedScore);
-          setEnrollmentCost(match?.internshipCost ?? null);
-          setEnrollmentPaid(
-            match != null && isInternshipPaid(match.internshipPaymentStatus),
+          const usedHere = match?.attemptsUsed ?? 0;
+          const mirroredOnAnotherTrack =
+            match != null &&
+            usedHere >= 2 &&
+            enrollments.some(
+              (row) =>
+                row.internshipProgramId !== match.internshipProgramId &&
+                row.attemptsUsed === usedHere,
+            );
+          const failedOnThisTrack = match
+            ? enrollments.filter(
+                (row) =>
+                  row.internshipProgramId === match.internshipProgramId &&
+                  isInternshipPaid(row.internshipPaymentStatus) &&
+                  (isInternshipInterviewFailed(row.interviewerStatus) ||
+                    (row.totalScore != null &&
+                      row.totalScoreMax != null &&
+                      !isInternshipScorePassing(row.totalScore, row.totalScoreMax))),
+              ).length
+            : 0;
+          setAttemptsExhaustedLocal(
+            failedOnThisTrack >= 2 || (usedHere >= 2 && !mirroredOnAnotherTrack),
           );
-          setAttemptsExhaustedLocal(match != null && isSecondTrialPaid(match));
           if (!paid) {
             setPaymentError(
               match
@@ -260,8 +264,6 @@ export default function InternshipInterviewStep({
           setEnrollmentInterviewUrl(null);
           setInterviewerStatus(null);
           setAttemptsExhaustedLocal(false);
-          setEnrollmentCost(null);
-          setEnrollmentPaid(false);
           setPaymentError(
             error instanceof Error
               ? error.message
@@ -300,13 +302,8 @@ export default function InternshipInterviewStep({
     score != null
       ? !isInternshipScorePassing(score.total, score.max)
       : interviewerStatus != null && isInternshipInterviewFailed(interviewerStatus);
-  const paidRetakeFee =
-    enrollmentPaid &&
-    Boolean(liveProgram?.secondPrice) &&
-    !feesMatch(liveProgram?.price, liveProgram?.secondPrice) &&
-    feesMatch(enrollmentCost, liveProgram?.secondPrice);
   const showAttemptsExhausted =
-    interviewFailed && (attemptsExhausted || attemptsExhaustedLocal || paidRetakeFee);
+    interviewFailed && (attemptsExhausted || attemptsExhaustedLocal);
   const resultProgramTitle =
     enrollmentProgramTitle || selection?.title || null;
 

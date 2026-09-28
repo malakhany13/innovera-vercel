@@ -13,7 +13,6 @@ import {
   formatInterviewerStatusLabel,
   formatPaymentStatusLabel,
   isInternshipInterviewFailed,
-  isSecondTrialPaid,
   isInternshipInterviewPassed,
   isInternshipPaid,
   type InternshipEnrollment,
@@ -64,7 +63,7 @@ type EnrollmentGate =
     }
   | { status: "error"; message: string };
 
-const SECOND_TRIAL_FAILED_PREFIX = "innovera:internship-second-trial-failed:";
+const SECOND_TRIAL_FAILED_PREFIX = "innovera:internship-same-track-two-fails:";
 
 function secondTrialFailedKey(email: string | null | undefined): string | null {
   const normalized = email?.trim().toLowerCase();
@@ -125,45 +124,25 @@ function interviewOutcomeFromEnrollment(
   return "pending";
 }
 
-function amountsEqual(
-  left: string | null | undefined,
-  right: string | null | undefined,
-): boolean {
-  const a = Number(String(left ?? "").replace(/,/g, ""));
-  const b = Number(String(right ?? "").replace(/,/g, ""));
-  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && a === b;
-}
-
 /**
- * The recorded fee is the retake price (for example 100 EGP), not the first-trial
- * price. Same price for both trials is ignored so a first payment is not treated
- * as the second.
- */
-function paidRetakeFee(
-  enrollment: InternshipEnrollment,
-  program: { price?: string | null; secondPrice?: string | null } | null,
-): boolean {
-  const retake = program?.secondPrice;
-  if (!retake) return false;
-  if (amountsEqual(program?.price, retake)) return false;
-  return amountsEqual(enrollment.internshipCost, retake);
-}
-
-/**
- * Short course page only after a paid second trial that was not passed.
- * A first failure still offers retake payment. A pass never qualifies.
+ * "We're sorry" only after two failed attempts on this same track.
+ * One failure here and one on a different track does not qualify.
  */
 function isShortCourseEnrollment(
   enrollment: InternshipEnrollment,
+  enrollments: InternshipEnrollment[],
   email?: string | null,
-  program?: { price?: string | null; secondPrice?: string | null } | null,
 ): boolean {
   if (!isInternshipPaid(enrollment.internshipPaymentStatus)) return false;
   if (interviewOutcomeFromEnrollment(enrollment) !== "failed") return false;
-  if (isSecondTrialPaid(enrollment) || paidRetakeFee(enrollment, program ?? null)) {
+  if (failedAttemptsOnTrack(enrollments, enrollment.internshipProgramId) >= 2) {
     return true;
   }
   return readSecondTrialFailedIds(email).includes(enrollment.internshipProgramId);
+}
+
+function isSameTrackAttemptsExhaustedMessage(message: string): boolean {
+  return /already used all\s+\d+\s+attempts/i.test(message);
 }
 
 /** Laravel still has an unfinished attempt, so a new enroll is rejected. */
@@ -209,18 +188,51 @@ function authToInternshipDefaults(
   return defaults;
 }
 
+function enrollmentTime(enrollment: InternshipEnrollment): number {
+  const stamp = Date.parse(enrollment.updatedAt || enrollment.createdAt || "");
+  return Number.isFinite(stamp) ? stamp : 0;
+}
+
+/** Latest enrollment is the track the student is on now, not an older one. */
 function pickEnrollment(
   enrollments: InternshipEnrollment[],
 ): InternshipEnrollment | null {
   if (enrollments.length === 0) return null;
 
-  const paid = enrollments.find(
-    (row) =>
-      isInternshipPaid(row.internshipPaymentStatus) || Boolean(row.interviewUrl),
-  );
-  if (paid) return paid;
+  return [...enrollments].sort((a, b) => {
+    const timeDiff = enrollmentTime(b) - enrollmentTime(a);
+    if (timeDiff !== 0) return timeDiff;
+    return b.id - a.id;
+  })[0];
+}
 
-  return enrollments[0];
+/**
+ * Failed attempts that belong to one internship track.
+ * A count repeated on a different track is treated as an account-wide total
+ * and is not used, so one failure on each of two tracks does not qualify.
+ */
+function failedAttemptsOnTrack(
+  enrollments: InternshipEnrollment[],
+  programId: number,
+): number {
+  const rows = enrollments.filter(
+    (row) => row.internshipProgramId === programId,
+  );
+  const failedRows = rows.filter(
+    (row) =>
+      isInternshipPaid(row.internshipPaymentStatus) &&
+      interviewOutcomeFromEnrollment(row) === "failed",
+  ).length;
+  const usedHere = Math.max(0, ...rows.map((row) => row.attemptsUsed ?? 0));
+  const mirroredOnAnotherTrack =
+    usedHere >= 2 &&
+    enrollments.some(
+      (row) =>
+        row.internshipProgramId !== programId &&
+        row.attemptsUsed === usedHere,
+    );
+
+  return Math.max(failedRows, mirroredOnAnotherTrack ? 0 : usedHere);
 }
 
 function selectionFromEnrollment(
@@ -323,15 +335,14 @@ export default function Internship() {
       if (interviewOutcome === "passed") {
         forgetSecondTrialFailed(user.email, enrollment.internshipProgramId);
       } else if (
-        isSecondTrialPaid(enrollment) ||
-        paidRetakeFee(enrollment, program)
+        failedAttemptsOnTrack(enrollments, enrollment.internshipProgramId) >= 2
       ) {
         rememberSecondTrialFailed(user.email, enrollment.internshipProgramId);
       }
       const attemptsExhausted = isShortCourseEnrollment(
         enrollment,
+        enrollments,
         user.email,
-        program,
       );
 
       setGate({
@@ -512,11 +523,12 @@ export default function Internship() {
           const enrollment =
             enrollments.find((row) => row.internshipProgramId === programId) ??
             null;
-          const failedAndPaid =
+          const failedTwiceOnThisTrack =
             enrollment != null &&
+            isSameTrackAttemptsExhaustedMessage(message) &&
             isInternshipPaid(enrollment.internshipPaymentStatus) &&
             interviewOutcomeFromEnrollment(enrollment) === "failed";
-          if (failedAndPaid && enrollment) {
+          if (failedTwiceOnThisTrack && enrollment) {
             rememberSecondTrialFailed(user.email, programId);
             const program =
               programsRef.current.find((row) => row.id === programId) ?? null;
@@ -723,6 +735,7 @@ export default function Internship() {
                     ) ?? null;
                   if (
                     enrollment &&
+                    isSameTrackAttemptsExhaustedMessage(message) &&
                     isInternshipPaid(enrollment.internshipPaymentStatus) &&
                     interviewOutcomeFromEnrollment(enrollment) === "failed"
                   ) {
