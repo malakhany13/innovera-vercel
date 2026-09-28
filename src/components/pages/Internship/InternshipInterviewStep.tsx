@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import ModalShell from "@/components/ui/ModalShell";
 import { useEffect, useMemo, useState } from "react";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -50,6 +51,10 @@ interface InternshipInterviewStepProps {
   attemptsExhausted?: boolean;
   /** Link mode: finished after opening / confirming interview. */
   onDone?: () => void;
+  /** Track the student already has progress on. Switching away shows a warning. */
+  currentTrack?: { programId: number; title: string } | null;
+  /** Failed result: leave this track and choose a different field. */
+  onSwitchTrack?: () => void;
 }
 
 interface FieldOption {
@@ -79,6 +84,8 @@ export default function InternshipInterviewStep({
   onRetryPayment,
   onDone,
   attemptsExhausted = false,
+  currentTrack = null,
+  onSwitchTrack,
 }: InternshipInterviewStepProps) {
   const { user, ready: authReady, logout } = useAuth();
   const [programId, setProgramId] = useState<number | "">(
@@ -99,6 +106,9 @@ export default function InternshipInterviewStep({
   const [enrollmentCost, setEnrollmentCost] = useState<string | null>(null);
   const [enrollmentPaid, setEnrollmentPaid] = useState(false);
   const [continuing, setContinuing] = useState(false);
+  const [pendingSwitch, setPendingSwitch] = useState<InternshipFieldSelection | null>(
+    null,
+  );
 
   const {
     data: allPrograms = [],
@@ -321,6 +331,7 @@ export default function InternshipInterviewStep({
         onRetryPayment={
           showAttemptsExhausted ? undefined : (onRetryPayment ?? onBackToPayment)
         }
+        onSwitchTrack={onSwitchTrack}
       />
     );
   }
@@ -409,6 +420,13 @@ export default function InternshipInterviewStep({
                     title: selectedOption.label,
                     price: selectedOption.price,
                   };
+                  const switchingAway =
+                    currentTrack != null &&
+                    currentTrack.programId !== nextSelection.programId;
+                  if (switchingAway) {
+                    setPendingSwitch(nextSelection);
+                    return;
+                  }
                   setContinuing(true);
                   void Promise.resolve(onContinue?.(nextSelection)).finally(() => {
                     setContinuing(false);
@@ -419,6 +437,55 @@ export default function InternshipInterviewStep({
                 {continuing ? "Checking payment…" : "Continue"}
                 {!continuing ? <ArrowRight className="w-4 h-4" /> : null}
               </button>
+
+              <ModalShell
+                isOpen={pendingSwitch != null}
+                onClose={() => setPendingSwitch(null)}
+                maxWidth="max-w-lg"
+              >
+                <div className="px-6 py-7 sm:px-8 sm:py-8">
+                  <h3 className="text-xl font-display font-bold text-slate-800 mb-3">
+                    Change your internship track?
+                  </h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Are you sure you want to switch from{" "}
+                    <span className="font-semibold text-slate-800">
+                      {currentTrack?.title || "your current track"}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold text-slate-800">
+                      {pendingSwitch?.title}
+                    </span>
+                    ? You will lose your progress on the first track. If you come
+                    back to it later, you will need to pay the first price again.
+                  </p>
+                  <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingSwitch(null)}
+                      className="inline-flex items-center justify-center px-5 py-3 rounded-full border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+                    >
+                      Keep my current track
+                    </button>
+                    <button
+                      type="button"
+                      disabled={continuing}
+                      onClick={() => {
+                        if (!pendingSwitch || continuing) return;
+                        const nextSelection = pendingSwitch;
+                        setPendingSwitch(null);
+                        setContinuing(true);
+                        void Promise.resolve(onContinue?.(nextSelection)).finally(() => {
+                          setContinuing(false);
+                        });
+                      }}
+                      className="inline-flex items-center justify-center px-5 py-3 rounded-full bg-brand-cyan text-white font-bold hover:bg-cyan-500 transition-colors disabled:opacity-50"
+                    >
+                      Yes, change track
+                    </button>
+                  </div>
+                </div>
+              </ModalShell>
             </>
           ) : (
             <>

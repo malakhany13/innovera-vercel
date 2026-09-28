@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, GraduationCap, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import {
   formatInternshipFee,
@@ -14,30 +15,31 @@ interface InternshipResultStepProps {
   feeAmount?: string | number | null;
   /** Aggregate AI-interviewer score, when Laravel recorded one for this attempt. */
   score?: { total: number; max: number } | null;
-  /** Selected internship track title (used for free short-course messaging). */
+  /** Selected internship track title. */
   programTitle?: string | null;
   /**
-   * Both AI interview attempts failed — student is enrolled in a free short course
-   * for their internship field (no further retake payment).
+   * Both AI interview attempts are finished — no further retake payment.
+   * The student can browse courses instead.
    */
   attemptsExhausted?: boolean;
   onRetryPayment?: () => void;
+  /** Leave this track and pick a different internship field. */
+  onSwitchTrack?: () => void;
 }
 
 export default function InternshipResultStep({
   outcome,
   feeAmount,
   score,
-  programTitle = null,
   attemptsExhausted = false,
   onRetryPayment,
+  onSwitchTrack,
 }: InternshipResultStepProps) {
   const failed = outcome === "failed";
   const fee = feeAmount != null ? formatInternshipFee(feeAmount) : null;
   const scorePercent =
     score && score.max > 0 ? Math.round((score.total / score.max) * 100) : null;
-  const fieldLabel = programTitle?.trim() || "your internship field";
-  const showShortCourse = failed && attemptsExhausted;
+  const showCourseBrowse = failed && attemptsExhausted;
 
   return (
     <div className="bg-white min-h-[70vh]">
@@ -66,30 +68,31 @@ export default function InternshipResultStep({
 
       <section className="relative z-10 max-w-2xl mx-auto px-6 -mt-20 sm:-mt-28 pb-20">
         <div className="bg-white rounded-[1.75rem] shadow-[0_16px_50px_-12px_rgba(15,23,42,0.18)] border border-slate-100 px-6 sm:px-10 py-8 sm:py-10">
-          {showShortCourse ? (
+          {showCourseBrowse ? (
             <div className="text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-brand-cyan/10">
-                <GraduationCap className="h-8 w-8 text-brand-cyan" aria-hidden />
-              </div>
               <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-800 leading-snug mb-3">
-                You&apos;re on the list
+                We&apos;re sorry
               </h2>
               <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-md mx-auto">
-                You have enrolled in a free of charge short course in your field
-                {programTitle?.trim() ? (
-                  <>
-                    {" "}
-                    (
-                    <span className="font-semibold text-slate-800">{fieldLabel}</span>
-                    )
-                  </>
-                ) : null}
-                .
+                You didn&apos;t pass the AI interview after both attempts. You can
+                browse our courses and keep building your skills.
               </p>
-              <p className="mt-4 text-sm text-slate-500 leading-relaxed max-w-md mx-auto">
-                Both AI interview attempts for this internship are complete, so there
-                is no further payment or retake.
-              </p>
+              <Link
+                href="/courses"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold shadow-lg shadow-brand-cyan/20 hover:bg-cyan-500 transition-colors"
+              >
+                Browse courses
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              {onSwitchTrack ? (
+                <button
+                  type="button"
+                  onClick={onSwitchTrack}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  Switch to another track
+                </button>
+              ) : null}
             </div>
           ) : (
           <>
@@ -160,14 +163,25 @@ export default function InternshipResultStep({
           </div>
 
           {failed ? (
-            <button
-              type="button"
-              onClick={() => onRetryPayment?.()}
-              className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold shadow-lg shadow-brand-cyan/20 hover:bg-cyan-500 transition-colors"
-            >
-              Retry payment
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => onRetryPayment?.()}
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold shadow-lg shadow-brand-cyan/20 hover:bg-cyan-500 transition-colors"
+              >
+                Retry payment
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              {onSwitchTrack ? (
+                <button
+                  type="button"
+                  onClick={onSwitchTrack}
+                  className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  Switch to another track
+                </button>
+              ) : null}
+            </div>
           ) : null}
           </>
           )}

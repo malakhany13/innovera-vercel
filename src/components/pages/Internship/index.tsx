@@ -166,7 +166,13 @@ function isShortCourseEnrollment(
   return readSecondTrialFailedIds(email).includes(enrollment.internshipProgramId);
 }
 
+/** Laravel still has an unfinished attempt, so a new enroll is rejected. */
+function isOpenAttemptResponse(message: string): boolean {
+  return /open attempt/i.test(message);
+}
+
 function isAttemptsLimitResponse(status: number, message: string): boolean {
+  if (isOpenAttemptResponse(message)) return false;
   if (/already used all\s+\d+\s+attempts/i.test(message)) return true;
   return status === 422 && /attempt/i.test(message);
 }
@@ -476,6 +482,29 @@ export default function Internship() {
       if (!enrollResponse.ok && !token) {
         const message = enrollPayload?.error || enrollPayload?.message || "";
 
+        // The current attempt is still open, so Laravel will not create another
+        // enrollment. Continue the interview, or open the retake payment page.
+        if (isOpenAttemptResponse(message)) {
+          const enrollments = await fetchMyEnrollmentsClient(user.token);
+          const enrollment =
+            enrollments.find((row) => row.internshipProgramId === programId) ??
+            null;
+          const program =
+            programsRef.current.find((row) => row.id === programId) ?? null;
+          if (enrollment) {
+            setFieldSelection(selectionFromEnrollment(enrollment, program));
+            setPaymentToken(enrollment.paymentToken);
+            const outcome = interviewOutcomeFromEnrollment(enrollment);
+            if (outcome === "pending" || outcome === "passed") {
+              setStep("interview");
+              return;
+            }
+          }
+          setIsSecondTrial(true);
+          setStep("payment");
+          return;
+        }
+
         // Both attempts are used. After a paid second trial that failed, there
         // is no further payment — only the short-course confirmation.
         if (isAttemptsLimitResponse(enrollResponse.status, message)) {
@@ -557,6 +586,20 @@ export default function Internship() {
     setStep("form");
   };
 
+  const switchToAnotherTrack = () => {
+    setIsSecondTrial(false);
+    setStep("field");
+  };
+
+  const currentTrack =
+    gate.status === "paid" || gate.status === "pending"
+      ? {
+          programId: gate.selection.programId,
+          title:
+            gate.enrollment.internshipProgramTitle || gate.selection.title,
+        }
+      : null;
+
   if (step === "form") {
     if (!ready) {
       return (
@@ -585,6 +628,7 @@ export default function Internship() {
         <InternshipInterviewStep
           mode="field"
           selection={fieldSelection}
+          currentTrack={currentTrack}
           onContinue={async (next) => {
             setFieldSelection(next);
             setIsSecondTrial(false);
@@ -762,6 +806,7 @@ export default function Internship() {
           outcome="failed"
           attemptsExhausted
           programTitle={shortCourseTitle}
+          onSwitchTrack={switchToAnotherTrack}
         />
       </div>
     );
@@ -787,6 +832,7 @@ export default function Internship() {
             void startRetryPayment(fieldSelection.programId);
           }}
           onDone={() => setStep("landing")}
+          onSwitchTrack={switchToAnotherTrack}
         />
       </div>
     );
@@ -799,6 +845,7 @@ export default function Internship() {
         tracks={tracks}
         tracksStatus={tracksStatus}
         onApply={handleApply}
+        onSwitchTrack={switchToAnotherTrack}
         onRefresh={() => {
           void refetchPrograms();
           void refreshEnrollmentGate();

@@ -45,6 +45,8 @@ interface InternshipLandingProps {
   tracksStatus: TracksStatus;
   onApply: () => void;
   onRefresh: () => void;
+  /** Failed interview: pick a different track instead of paying to retake. */
+  onSwitchTrack?: () => void;
 }
 
 function ctaLabel(gate: LandingGate): string {
@@ -54,7 +56,7 @@ function ctaLabel(gate: LandingGate): string {
     return "View your result";
   }
   if (gate.status === "paid" && gate.interviewOutcome === "failed") {
-    if (gate.attemptsExhausted) return "View your short course";
+    if (gate.attemptsExhausted) return "Browse courses";
     return "Retry payment";
   }
   if (gate.status === "paid") return "Continue to AI interview";
@@ -68,6 +70,7 @@ export default function InternshipLanding({
   tracksStatus,
   onApply,
   onRefresh,
+  onSwitchTrack,
 }: InternshipLandingProps) {
   const checking = gate.status === "loading" || gate.status === "idle";
   const liveRetakeFee =
@@ -145,13 +148,12 @@ export default function InternshipLanding({
                     gate.attemptsExhausted ? (
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-brand-navy">
-                        You&apos;re on the list
+                        We&apos;re sorry — you didn&apos;t pass
                       </p>
                       <p className="text-sm text-slate-600">
-                        You have enrolled in a free of charge short course in your
-                        field
+                        Both interview attempts are complete. You can browse our courses
                         {gate.enrollment.internshipProgramTitle
-                          ? ` (${gate.enrollment.internshipProgramTitle})`
+                          ? ` and keep learning in ${gate.enrollment.internshipProgramTitle}`
                           : ""}
                         .
                       </p>
@@ -249,24 +251,39 @@ export default function InternshipLanding({
               ))}
             </ol>
 
-            <button
-              type="button"
-              onClick={onApply}
-              disabled={checking}
-              className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold text-sm sm:text-base shadow-lg shadow-brand-cyan/25 hover:bg-cyan-500 transition-colors disabled:opacity-60"
-            >
-              {checking ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Checking status…
-                </>
-              ) : (
-                <>
-                  {ctaLabel(gate)}
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={onApply}
+                disabled={checking}
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-brand-cyan text-white font-bold text-sm sm:text-base shadow-lg shadow-brand-cyan/25 hover:bg-cyan-500 transition-colors disabled:opacity-60"
+              >
+                {checking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking status…
+                  </>
+                ) : (
+                  <>
+                    {ctaLabel(gate)}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+              {!checking &&
+              gate.status === "paid" &&
+              gate.interviewOutcome === "failed" &&
+              !gate.attemptsExhausted &&
+              onSwitchTrack ? (
+                <button
+                  type="button"
+                  onClick={onSwitchTrack}
+                  className="w-full inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-sm sm:text-base hover:bg-slate-50 transition-colors"
+                >
+                  Change track
+                </button>
+              ) : null}
+            </div>
           </div>
         </motion.div>
       </section>
