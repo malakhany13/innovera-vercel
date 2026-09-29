@@ -256,12 +256,12 @@ const nextConfig: NextConfig = {
   ...(!isStaticExport
     ? {
         async rewrites() {
-          const rules = [
+          const rules = DIRECTUS_URL ? [
             {
               source: "/api/directus/:path*",
               destination: `${DIRECTUS_URL}/:path*`,
             },
-          ];
+          ] : [];
           if (API_REWRITE_URL) {
             rules.push(
               // So client fallback `/api/v1/news|events` hits the Railway API, not the
