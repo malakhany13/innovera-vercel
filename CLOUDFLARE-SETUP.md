@@ -142,3 +142,11 @@ References:
 - https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/
 - https://opennext.js.org/cloudflare/get-started
 - https://developers.cloudflare.com/workers/ci-cd/builds/
+
+
+## Cloudflare setup progress (2026-09-29)
+
+The innovera Worker is connected to the cloudflare-migration branch.
+The private Standard-class R2 bucket innovera-next-cache has been created.
+API_BASE_URL and NEXT_PUBLIC_API_BASE_URL are configured as build variables.
+The Cloudflare build and live-site verification are still pending.
